@@ -1,6 +1,17 @@
 version: '3'
 
 services:
+  # web
+  web:
+    image: node:current-alpine
+    working_dir: /usr/src/app
+    volumes:
+      - ./services/web:/usr/src/app
+    tty: true
+    command: [sh, -c, npm run start]
+    ports:
+      - '3000:3000'
+
   # nginx
   nginx:
     image: nginx:stable-alpine

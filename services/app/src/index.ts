@@ -16,7 +16,13 @@ const io = new Server<
     ClientToServerEvents,
     InterServerEvents,
     SocketData
->();
+>(httpServer, {
+    cors: {
+        origin: "http://localhost:3000",
+    }
+});
+
+// RabbitMQ設定
 
 // WebSocketイベント
 io.on("connection", (socket) => {
@@ -24,7 +30,7 @@ io.on("connection", (socket) => {
 })
 
 // サーバーリッスン
-const port = 3000;
+const port = 3001;
 httpServer.listen(port, () => {
     console.log(`Server is running on port ${port}`);
 });
