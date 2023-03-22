@@ -6,20 +6,17 @@ const socket = io("http://localhost");
 function App() {
 
   React.useEffect(() => {
-    if (!socket.hasListeners('connect')) {
       socket.on('connect', () => {
-        console.log('Connected to server');
+        console.log('Connected to server: ' + socket.id);
       });
-    }
-    if (!socket.hasListeners('message')) {
-      socket.on('message', (message: string) => {
-        console.log('Message from server: ', message);
-      });
-    }
+    
+    socket.on('receive', (message: string) => {
+      console.log('Message from server: ', message);
+    });
 
     return () => {
       socket.off('connect');
-      socket.off('message');
+      socket.off('receive');
     }
   }, []);
 
@@ -29,6 +26,7 @@ function App() {
     const message = e.currentTarget.message.value;
     if (!message) return;
 
+    socket.emit('message', message);
     e.currentTarget.message.value = '';
   }
 
