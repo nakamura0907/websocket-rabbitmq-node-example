@@ -1,30 +1,37 @@
 import express from "express";
-import amqp from "amqplib"
+import amqp from "amqplib";
 import { createServer } from "http";
 import { Server, Socket } from "socket.io";
 
 // Socket.ioの型
 type ServerToClientEvents = {
-    receive: (message: string) => void;
+  receive: (message: string) => void;
 };
 type ClientToServerEvents = {
-    message: (message: string) => void;
+  message: (message: string) => void;
 };
 type InterServerEvents = {};
 type SocketData = {};
+
+type MySocket = Socket<
+  ClientToServerEvents,
+  ServerToClientEvents,
+  InterServerEvents,
+  SocketData
+>;
 
 // サーバー設定
 const app = express();
 const httpServer = createServer(app);
 const io = new Server<
-    ClientToServerEvents,
-    ServerToClientEvents,
-    InterServerEvents,
-    SocketData
+  ClientToServerEvents,
+  ServerToClientEvents,
+  InterServerEvents,
+  SocketData
 >(httpServer, {
-    cors: {
-        origin: "http://localhost:3000",
-    }
+  cors: {
+    origin: "http://localhost:3000",
+  },
 });
 
 // RabbitMQ設定
@@ -32,42 +39,49 @@ const amqpUrl = "amqp://user:password@rabbitmq";
 const amqpQueue = "chats";
 
 // WebSocketイベント
-const clients = new Set<Socket<ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData>>();
+const clients = new Set<MySocket>();
 io.on("connection", (socket) => {
-    console.log(socket.id);
-    clients.add(socket);
+  clients.add(socket);
 
-    (async () => {
-        // RabbitMQ接続
-        const connection = await amqp.connect(amqpUrl);
-        const channel = await connection.createChannel();
+  (async () => {
+    // RabbitMQ接続
+    const connection = await amqp.connect(amqpUrl);
+    const channel = await connection.createChannel();
 
-        await channel.assertQueue(amqpQueue);
+    await channel.assertQueue(amqpQueue);
 
-        // メッセージ送信イベント
-        socket.on("message", (message) => {
-            console.log(`PUSH: ${socket.id} ${message}`)
-            channel.sendToQueue(amqpQueue, Buffer.from(message));
-        });
-
-        // メッセージ受信イベント
-        channel.consume(amqpQueue, (message) => {
-            if (!message) return;
-            
-            for (const client of clients) {
-                console.log(`PULL: ${client.id} ${message.content.toString()}`)
-                client.emit("receive", message.content.toString());
-            }
-        }, { noAck: true });
-    })()
-
-    socket.on("disconnect", () => {
-        clients.delete(socket);
+    // メッセージ送信イベント
+    socket.on("message", (message) => {
+      console.log(`PUSH: ${socket.id} ${message}`);
+      channel.sendToQueue(amqpQueue, Buffer.from(message));
     });
-})
+
+    // メッセージ受信イベント
+    channel.consume(
+      amqpQueue,
+      (message) => {
+        if (!message) return;
+
+        const data = message.content.toString();
+        for (const client of clients) {
+          console.log(`PULL: ${client.id} ${data}`);
+          client.emit("receive", data);
+        }
+
+        // 必要に応じて永続化する
+        // exampleSaveUseCase.execute(data);
+      },
+      { noAck: true }
+    );
+  })();
+
+  socket.on("disconnect", () => {
+    clients.delete(socket);
+  });
+});
 
 // サーバーリッスン
 const port = 3001;
 httpServer.listen(port, () => {
-    console.log(`Server is running on port ${port}`);
+  console.log(`Server is running on port ${port}`);
 });
