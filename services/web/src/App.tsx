@@ -1,7 +1,7 @@
 import React from "react";
 import { io, Socket } from "socket.io-client";
 
-import "./App.css";
+import styles from "./App.module.css";
 
 type ServerToClientEvents = {
   connect: () => void;
@@ -14,18 +14,42 @@ type ClientToServerEvents = {
 
 type MySocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 
+type Message = {
+  id: string;
+  body: string;
+  createdAt: Date;
+};
+type State = {
+  id?: string;
+  messages: Message[];
+};
+
+const initialState: State = {
+  id: undefined,
+  messages: [],
+};
+
 const socket: MySocket = io("http://localhost");
 function App() {
+  const [id, setId] = React.useState(initialState.id);
+  const [messages, setMessages] = React.useState(initialState.messages);
+
   React.useEffect(() => {
     if (!socket.hasListeners("connect")) {
       socket.on("connect", () => {
         console.log("Connected to server: ", socket.id);
+        setId(socket.id);
       });
     }
 
     if (!socket.hasListeners("receive")) {
       socket.on("receive", (message) => {
-        console.log("Message from server: ", message);
+        const data = JSON.parse(message);
+        console.log("Message from server: ", data);
+        setMessages((messages) => [
+          ...messages,
+          { id: data.id, body: data.message, createdAt: data.createdAt },
+        ]);
       });
     }
 
@@ -46,12 +70,47 @@ function App() {
   };
 
   return (
-    <div>
-      <h1>WebSocket + RabbitMQ</h1>
+    <div className={styles.container}>
       <div>
-        <form onSubmit={handleSubmit}>
-          <input type="text" name="message" />
-          <button type="submit">Send</button>
+        <h1>WebSocket + RabbitMQ</h1>
+      </div>
+      <div className={styles.messages}>
+        {messages.map((message, index) => {
+          const isSelf = id === message.id;
+          return (
+            <div className={styles.message} key={index}>
+              <div
+                className={
+                  styles["message-meta"] +
+                  (isSelf ? ` ${styles["message-meta--self"]}` : "")
+                }
+              >
+                <span
+                  className={
+                    styles["message-body"] +
+                    (isSelf ? ` ${styles["message-body--self"]}` : "")
+                  }
+                >
+                  {message.body}
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div className={styles["form-container"]}>
+        <form onSubmit={handleSubmit} className={styles.form}>
+          <input
+            type="text"
+            name="message"
+            placeholder="メッセージを入力してください"
+            className={styles.input}
+          />
+          <div>
+            <button type="submit" className={styles.button}>
+              送信する
+            </button>
+          </div>
         </form>
       </div>
     </div>

@@ -53,7 +53,17 @@ io.on("connection", (socket) => {
     // メッセージ送信イベント
     socket.on("message", (message) => {
       console.log(`PUSH: ${socket.id} ${message}`);
-      channel.sendToQueue(amqpQueue, Buffer.from(message));
+
+      const now = new Date(
+        new Date().toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" })
+      );
+      const content = JSON.stringify({
+        id: socket.id,
+        message,
+        createdAt: now,
+      });
+
+      channel.sendToQueue(amqpQueue, Buffer.from(content));
     });
 
     // メッセージ受信イベント
