@@ -29,12 +29,16 @@ const initialState: State = {
   messages: [],
 };
 
-const socket: MySocket = io("http://localhost");
+const socket: MySocket = io("http://localhost", {
+  autoConnect: false,
+});
 function App() {
   const [id, setId] = React.useState(initialState.id);
   const [messages, setMessages] = React.useState(initialState.messages);
 
   React.useEffect(() => {
+    socket.connect();
+
     if (!socket.hasListeners("connect")) {
       socket.on("connect", () => {
         console.log("Connected to server: ", socket.id);
@@ -46,6 +50,7 @@ function App() {
       socket.on("receive", (message) => {
         const data = JSON.parse(message);
         console.log("Message from server: ", data);
+
         setMessages((messages) => [
           ...messages,
           { id: data.id, body: data.message, createdAt: data.createdAt },
@@ -56,6 +61,8 @@ function App() {
     return () => {
       socket.off("connect");
       socket.off("receive");
+
+      socket.disconnect();
     };
   }, []);
 
